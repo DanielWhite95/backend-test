@@ -1,24 +1,26 @@
 from flask import Flask
-from mysql.connector import connect,errorcode
-import config.py
+from mysql.connector import connect,errorcode,Error
+import config
 
 app = Flask('backend-test')
 
-try
-  db_connection = mysql.connector.connect(**db_config)
-except mysql.connector.Error as err:
+try:
+  db_connection = connect(**config.db_config)
+except Error as err:
   db_conn_error = err
   print(f"There was an error setting connection to DB: %s" % (err,))
 
-@app.route("/")
+@app.route("/", methods=["GET"])
 def search_node_children(node_id, language, search_keyword, page_num, page_size):
-    if db_conn_error:
-        resp_error
-    if node_id == None or language == None:
-        resp_error = "Missing required arguments"
-    
-    return "<p>Root node</p>"
 
+# retrieve a single node from the db and build the class
+def query_node(nodeid):
+  if nodeid == None or nodeid < 0 :
+    return None
+  sql_query = "SELECT * FROM node_tree_names WHERE idNode = %s"
+  # query usando db_connection
+  node = Node() # buid node with query result
+  
 class Node():
     def __init__(id, level, left_child, right_child):
         _id = id
@@ -32,3 +34,8 @@ class Node():
             return
         _names[language] = name
 
+    def get_json(language='english'):
+        return {
+            "node_id": _id,
+            "name": _names[language]
+          }
