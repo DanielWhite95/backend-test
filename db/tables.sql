@@ -1,8 +1,9 @@
 CREATE TABLE IF NOT EXISTS node_tree(
-       idNode INT NOT NULL PRIMARY KEY,
+       idNode INT NOT NULL,
        level INT NOT NULL,
        iLeft INT,
-       iRight INT
+       iRight INT,
+       PRIMARY KEY(idNode)
 );
 
 CREATE TABLE IF NOT EXISTS node_tree_names(
