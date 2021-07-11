@@ -1,6 +1,6 @@
-from flask import Flask
+from flask import Flask,current_app, g,request
 from mysql.connector import connect,errorcode,Error
-from flask import current_app, g, request
+from flask import 
 from flask.cli import with_appcontext
 import config
 
@@ -15,6 +15,7 @@ def get_db():
         except Error as err:
             g.db_err = err
             print(f"There was an error setting connection to DB: ${err}")
+            pass
     else: 
         return g.db
 
@@ -61,6 +62,8 @@ def find_children_for_node():
         return build_error_message("Only 'english' and 'italian' language are supported")
 
     search_keyword = request.args.get('search_keyword', '')
+    # help function to filter out results
+    filter_f = lambda x: (x['name'].find(search_keyword) != -1)
     page_num = int(request.args.get('page_num', '0'))
     page_size = int(request.args.get('page_size', '100'))
 
@@ -87,6 +90,14 @@ def find_children_for_node():
 
     for node in children_nodes: 
         node['children_count'] = count_children(node['node_id'])
+
+    # filter result based on search_keyword
+    if search_keyword != '':
+        children_results = filter(filter_f, children_results)
+
+    # select correct page for result
+    children_results = children_results[page_num * page_size:max((page_num+1) * page_size:len(children_results)] 
+
 
     return {
             "nodes": children_nodes,
