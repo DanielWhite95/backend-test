@@ -1,12 +1,11 @@
 from flask import Flask,current_app, g,request
+from werkzeug.exceptions import HTTPException
 from mysql.connector import connect,errorcode,Error
-from flask import 
-from flask.cli import with_appcontext
+import json
 import config
 
-
-
-
+# Returns connection to MySQL DB if present, otherwise initialize it and
+# make it shared among requests
 def get_db():
     if 'db' not in g:
         try:
@@ -19,8 +18,6 @@ def get_db():
     else: 
         return g.db
 
-
-
 def close_db(e=None):
     db = g.pop('db', None)
 
@@ -29,10 +26,14 @@ def close_db(e=None):
 
 # Initiate Flask application
 app = Flask('backend-test')
-app.config.from_mapping(
-        SECRET_KEY='dev',
-        )
 app.teardown_appcontext(close_db)
+
+
+class InvalidParameter(HTTPException):
+    code = 400
+
+class DBException(HTTPException):
+    code = 500
 
 # The only endpoint of the program
 # should accept only GET request with these parameters:
@@ -51,15 +52,15 @@ def find_children_for_node():
     try:
         node_id = int(request.args.get('node_id', '')) 
     except:
-        return build_error_message("'node_id' parameter is required")
+        raise InvalidParameter(description="node_id parameter is required")
 
 
     if node_id < 0 :
-        return build_error_message("Invalid node_id. Node ID must be  a number bigger than 0")
+        raise InvalidParameter(description="Invalid node_id. Node ID must be  a number bigger than 0")
 
     language = request.args.get('language', '')
     if not (language == 'english' or language == 'italian'):
-        return build_error_message("Only 'english' and 'italian' language are supported")
+        raise InvalidParameter(description="Only 'english' and 'italian' language are supported")
 
     search_keyword = request.args.get('search_keyword', '')
     # help function to filter out results
@@ -68,36 +69,43 @@ def find_children_for_node():
     page_size = int(request.args.get('page_size', '100'))
 
     # obtain DB Cursor for executing query  
-    db = get_db()
-    cursor = db.cursor()
+    try: 
+        cursor = get_db().cursor()
 
-    sql_query = ("SELECT Child.idNode, node_tree_names.nodeName " \
-          "FROM node_tree as Child, node_tree as Parent " 
-          "INNER JOIN node_tree_names " 
-          "WHERE node_tree_names.idNode = Child.idNode " 
-          "AND Child.iLeft > Parent.iLeft "
-          "AND Child.iRight < Parent.iRight " 
-          "AND Parent.idNode = %s " 
-          "AND node_tree_names.language = %s")
-    cursor.execute(sql_query, (node_id, language))
+        sql_query = ("SELECT Child.idNode, node_tree_names.nodeName " \
+              "FROM node_tree as Child, node_tree as Parent " 
+              "INNER JOIN node_tree_names " 
+              "WHERE node_tree_names.idNode = Child.idNode " 
+              "AND Child.iLeft > Parent.iLeft "
+              "AND Child.iRight < Parent.iRight " 
+              "AND Parent.idNode = %s " 
+              "AND node_tree_names.language = %s")
+        cursor.execute(sql_query, (node_id, language))
 
-    # Build result
-    children_nodes = []
-    for (id, name) in cursor: 
-        children_nodes.append({ "node_id": id, "name": name, "children_coutn": 0 })
+        # Build result
+        children_nodes = []
+        for (id, name) in cursor: 
+            children_nodes.append({ "node_id": id, "name": name, "children_coutn": 0 })
 
-    cursor.close()
+        cursor.close()
+    except Exception as err:
+        print(err)
+        raise DBException(description="There was an error with the database!")
 
     for node in children_nodes: 
         node['children_count'] = count_children(node['node_id'])
 
     # filter result based on search_keyword
     if search_keyword != '':
-        children_results = filter(filter_f, children_results)
+        children_nodes = list(filter(filter_f, children_nodes))
 
     # select correct page for result
-    children_results = children_results[page_num * page_size:max((page_num+1) * page_size:len(children_results)] 
+    # avoid case where page_num is bigger than actual size
+    start_index = min(page_num * page_size, len(children_nodes))
+    end_index = min((page_num+1) * page_size,len(children_nodes))
 
+
+    children_nodes = children_nodes[start_index:end_index] 
 
     return {
             "nodes": children_nodes,
@@ -111,46 +119,53 @@ def find_children_for_node():
 # Function that uses an optimized query for counting how many children has a node
 def count_children(nodeId):
     # Obtain DB Cursor for query
-    cursor = get_db().cursor()
+    try:
+        cursor = get_db().cursor()
 
-    sql_query = ("SELECT COUNT(Child.idNode) " 
-          "FROM node_tree as Child, node_tree as Parent " 
-          "WHERE Child.iLeft > Parent.iLeft " 
-          "AND Child.iRight < Parent.iRight " 
-          "AND Parent.idNode = %s ")
+        sql_query = ("SELECT COUNT(Child.idNode) " 
+              "FROM node_tree as Child, node_tree as Parent " 
+              "WHERE Child.iLeft > Parent.iLeft " 
+              "AND Child.iRight < Parent.iRight " 
+              "AND Parent.idNode = %s ")
 
-    cursor.execute(sql_query, (nodeId,))
+        cursor.execute(sql_query, (nodeId,))
 
-    children_count = 0 
-    # to fix and avoid for loop
-    for (count,) in cursor: 
-        children_count = count 
+        children_count = 0 
+        # to fix and avoid for loop
+        for (count,) in cursor: 
+            children_count = count 
 
-    cursor.close() 
+        cursor.close() 
+    except  Exception as err: 
+        print(err)
+        raise DBException(description="There was an error with the database")
 
     return children_count
 
-def build_error_message(msg):
-    return {
-            "nodes": [],
-            "error": msg
-            }
+@app.errorhandler(HTTPException)
+def handle_exception(e):
+    """Return JSON instead of HTML for HTTP errors."""
+    # start with the correct headers and status code from the error
+    response = e.get_response()
+    # replace the body with JSON
+    response.data = json.dumps({
+        "nodes": [],
+        "error": e.get_description()
+    })
+    response.status = e.code
+    response.content_type = "application/json"
+    return response
 
-# class Node():
-#     def __init__(id, level, left_child, right_child):
-#         _id = id
-#         _level = level
-#         _left_child = left_child
-#         _right_child = right_child
-#         _names = dict()
 # 
-#     def set_name(name, language):
-#         if not (language == 'english' or language == 'italian'):
-#             return
-#         _names[language] = name
-# 
-#     def get_json(language='english'):
-#         return {
-#                 "node_id": _id,
-#                 "name": _names[language]
-#                 }
+# @app.errorhandler(InvalidException)
+# def handle_exception(e):
+#     """Return JSON instead of HTML for HTTP errors."""
+#     # start with the correct headers and status code from the error
+#     response = e.get_response()
+#     # replace the body with JSON
+#     response.data = json.dumps({
+#         "nodes": []
+#         "error": e.get_description()
+#     })
+#     response.content_type = "application/json"
+#     return response
