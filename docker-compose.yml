@@ -1,0 +1,17 @@
+services:
+  db:
+    build: db/
+    environment:
+        MYSQL_ROOT_PASSWORD: "r00t4"
+        MYSQL_DATABASE: "backendtest"
+        MYSQL_USER: "docebo"
+        MYSQL_PASSWORD: "bocedo"
+    ports: 
+        - "3306:3306"
+        - "33060:33060"
+    restart: always
+  api:
+    build: api/
+    ports:
+        - "5000:5000"
+    restart: always

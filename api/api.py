@@ -85,7 +85,7 @@ def find_children_for_node():
         # Build result
         children_nodes = []
         for (id, name) in cursor: 
-            children_nodes.append({ "node_id": id, "name": name, "children_coutn": 0 })
+            children_nodes.append({ "node_id": id, "name": name })
 
         cursor.close()
     except Exception as err:
