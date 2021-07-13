@@ -131,15 +131,15 @@ def execute_query_on_db(sql_query, args, fetch_one=False):
         cursor.execute(sql_query, args)
 
         # Store query results before closing current cursor
-        result = cursor.fetchall()
+        if fetch_one:
+            result = cursor.fetchone()
+        else:
+            result = cursor.fetchall()
 
         cursor.close()
     except Exception as err:
         raise DBException(description="There was an error with the database!")
-    if fetch_one:
-        return result[0]
-    else:
-        return result
+    return result
 
 
 # Define a Flask application factory
