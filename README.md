@@ -20,3 +20,8 @@ A *Dockerfile* is provided with API server to build a test container and quickly
 In additon, a Docker Compose specification (*docker-compose.yml*) is provided for deploying a simple test environment 
 with a DB and an API server.
 In order to use docker-compose you have to modify *config.py* and set host to 'db', to have a proper connection between DB and API containers
+
+To build and start  the test environment, run the following commands:
+1. ```docker-compose build```
+2. ```docker-compose up```
+
