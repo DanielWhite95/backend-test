@@ -74,26 +74,29 @@ class DBException(HTTPException):
 
 
 
-def node_exists(nodeId):
-    """Check if there is node with id=nodeId in the DB."""
+def node_exists(node_id):
+    """Check if there is node with id=node_id in the DB."""
 
     sql_query = ("SELECT Tree.idNode " \
           "FROM node_tree as Tree " 
           "WHERE Tree.idNode = %s")
-    result_id = execute_query_on_db(sql_query, (nodeId,), fetch_one=True)
+    result_id = execute_query_on_db(sql_query, (node_id,), fetch_one=True)
     # Id is greater than 0
     return result_id != None
 
 
 
 def validate_node_id(request):
+    node_id = request.args.get('node_id', None)
+    if not node_id:
+        raise InvalidParameterException(description="Missing mandatory params")
     try:
         node_id = int(request.args.get('node_id', '')) 
     except:
-        raise InvalidParameterException(description="node_id parameter is required and should be an integer")
+        raise InvalidParameterException(description="Invalid node id")
 
     if node_id < 0 :
-        raise InvalidParameterException(description="Invalid node_id. Node ID must be  a number bigger than 0")
+        raise InvalidParameterException(description="Invalid node id")
 
     return node_id
 
@@ -101,17 +104,17 @@ def validate_language(request):
     try:
         language = Language[request.args.get('language', '')]
     except:
-        raise InvalidParameterException(description="Invalid Language: only 'english' and 'italian' languages are supported.")
+        raise InvalidParameterException(description="Missing mandatory params")
     return language
 
 def validate_page_num(request):
     try:
         page_num = int(request.args.get('page_num', '0'))
     except: 
-        raise InvalidParameterException(description="page_num and page_size parameters should be numbers.")
+        raise InvalidParameterException(description="Invalid page number requested")
 
     if page_num < 0 :
-        raise InvalidParameterException(description="page_num should be bigger than 0.")
+        raise InvalidParameterException(description="Invalid page number requested")
 
     return page_num
 
@@ -119,10 +122,10 @@ def validate_page_size(request):
     try:
         page_size = int(request.args.get('page_size', '100'))
     except: 
-        raise InvalidParameterException(description="page_size parameter should be numbers.")
+        raise InvalidParameterException(description="Invalid page size requested")
 
     if page_size < 0 or page_size > 1000:
-        raise InvalidParameterException(description="page_size should be in the range [0,1000].")
+        raise InvalidParameterException(description="Invalid page size requested")
     return page_size
 
 def execute_query_on_db(sql_query, args, fetch_one=False):
@@ -163,7 +166,7 @@ def create_app(test_config=None):
         # in case of invalid parameters, exception is handled by exception handler
         node_id = validate_node_id(request)
         language = validate_language(request)
-        search_keyword = request.args.get('search_keyword', '')
+        search_keyword = request.args.get('search_keyword', None)
         page_num = validate_page_num(request)
         page_size = validate_page_size(request)
 
@@ -194,7 +197,8 @@ def create_app(test_config=None):
             node.count_children()
 
         # filter result based on search_keyword
-        children_nodes = [ child for child in children_nodes if child.get_name().find(search_keyword) != -1 ]
+        if search_keyword: 
+            children_nodes = [ child for child in children_nodes if search_keyword.lower() in child.get_name().lower() ]
 
         # select correct page for result
         # avoid case where page_num is bigger than actual size
