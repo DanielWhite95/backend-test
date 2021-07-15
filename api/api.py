@@ -84,12 +84,16 @@ def node_exists(node_id):
     # Id is greater than 0
     return result_id != None
 
-
+def check_required_params(request):
+    """Check if required parameters are present, otherwise raise an exception"""
+    if not request.args.get('node_id', None):
+        raise InvalidParameterException(description="Missing mandatory params")
+    if not request.args.get('language', None):
+        raise InvalidParameterException(description="Missing mandatory params")
 
 def validate_node_id(request):
-    node_id = request.args.get('node_id', None)
-    if not node_id:
-        raise InvalidParameterException(description="Missing mandatory params")
+
+    # Assume that check_required_params has been already called
     try:
         node_id = int(request.args.get('node_id', '')) 
     except:
@@ -101,10 +105,12 @@ def validate_node_id(request):
     return node_id
 
 def validate_language(request):
+
+    # Assume that check_required_params has been already called
     try:
         language = Language[request.args.get('language', '')]
     except:
-        raise InvalidParameterException(description="Missing mandatory params")
+        raise InvalidParameterException(description="Invalid language requested")
     return language
 
 def validate_page_num(request):
@@ -162,6 +168,9 @@ def create_app(test_config=None):
             provided, defaults to “0”.
             - `page_size` (integer, optional): the size of the page to retrieve, ranging from 0 to 1000. If
             not provided, defaults to “100”."""
+        # check mandatory parameters
+        check_required_params(request)
+
         # validate input parameters
         # in case of invalid parameters, exception is handled by exception handler
         node_id = validate_node_id(request)
@@ -173,7 +182,7 @@ def create_app(test_config=None):
         # No particular requirements for page_num and page_size
         
         if not node_exists(node_id) :
-            raise NotFoundException(description=f"Node with ID {node_id} does not exists")
+            raise NotFoundException(description=f"Invalid node id")
                 
 
         # Execute query DB and build the result
