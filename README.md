@@ -1,6 +1,6 @@
 # Backend-Test
 This program solves the test for organizational charts.
-The program is develeoped in Python 3.7.3 and Flask 2.0 but should be compatible with Python 3.x
+The program is develeoped using Python 3.7.3 and Flask 2.0 but should be compatible with Python 3.x
 The only dependencies are Flask 2.0 and mysql-connector-plugin. All requirements can be installed with the command
 ```pip install -r api/requirements```
 
